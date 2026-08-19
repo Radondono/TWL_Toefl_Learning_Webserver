@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - TOEFL Vocab</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-card wide">
+        <div class="header-row">
+            <h1>⚙️ Admin Panel</h1>
+            <div>
+                <span class="user-label">👤 {{ session.username }}</span>
+                <a href="/dashboard" class="btn btn-outline">🏠 Dashboard</a>
+                <a href="/admin/messages" class="btn btn-primary">📨 Send Message</a>
+                <a href="/logout" class="btn btn-danger-outline">Logout</a>
+            </div>
+        </div>
+        <div class="subtitle">Manage users – ban/unban, delete progress, change passwords</div>
+
+        <div class="admin-table-wrap">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Words tried</th>
+                        <th>Attempts</th>
+                        <th>Correct</th>
+                        <th>Mastered</th>
+                        <th>Difficult</th>
+                        <th colspan="3">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                        <tr>
+                            <td>{{ user[1] }}</td>
+                            <td>{{ user[2] }}</td>
+                            <td>
+                                {% if user[3] %}
+                                    <span style="color:#d47a7a; font-weight:600;">🚫 Banned</span>
+                                {% else %}
+                                    <span style="color:#1f8b4c;">✅ Active</span>
+                                {% endif %}
+                            </td>
+                            <td class="center">{{ user[4] or 0 }}</td>
+                            <td class="center">{{ user[5] or 0 }}</td>
+                            <td class="center">{{ user[6] or 0 }}</td>
+                            <td class="center">{{ user[7] or 0 }}</td>
+                            <td class="center">{{ user[8] or 0 }}</td>
+                            <td>
+                                <button class="btn btn-outline ban-btn" data-userid="{{ user[0] }}" data-username="{{ user[1] }}" data-banned="{{ user[3] }}">
+                                    {% if user[3] %}Unban{% else %}Ban{% endif %}
+                                </button>
+                            </td>
+                            <td>
+                                <button class="btn btn-danger-outline delete-progress-btn" data-userid="{{ user[0] }}" data-username="{{ user[1] }}">
+                                    🗑️ Delete Progress
+                                </button>
+                            </td>
+                            <td>
+                                <form class="change-pw-form" data-userid="{{ user[0] }}" style="display:flex; gap:6px; align-items:center;">
+                                    <input type="password" name="new_password" placeholder="New password" required minlength="4" style="padding:4px 8px; border-radius:8px; border:1px solid #b8cae0; font-size:13px; width:110px;">
+                                    <button type="submit" class="btn btn-primary" style="padding:4px 12px; font-size:13px;">Change</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top:20px; color:#5a6e8a; font-size:14px; text-align:center;">
+            Admin actions are logged in the server console.
+        </div>
+    </div>
+
+    <script>
+        // ---- Ban/Unban ----
+        document.querySelectorAll('.ban-btn').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const userId = this.dataset.userid;
+                const username = this.dataset.username;
+                const currentBanned = this.dataset.banned === '1';
+                const action = currentBanned ? 'unban' : 'ban';
+                if (!confirm(`Are you sure you want to ${action} user "${username}"?`)) return;
+                try {
+                    const res = await fetch(`/admin/ban/${userId}`, { method: 'POST' });
+                    const data = await res.json();
+                    if (data.message) {
+                        alert(data.message);
+                        window.location.reload();
+                    } else {
+                        alert('Error: ' + (data.error || 'Unknown'));
+                    }
+                } catch (e) {
+                    alert('Network error.');
+                }
+            });
+        });
+
+        // ---- Delete Progress ----
+        document.querySelectorAll('.delete-progress-btn').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const userId = this.dataset.userid;
+                const username = this.dataset.username;
+                if (!confirm(`Are you sure you want to delete ALL progress for "${username}"? This cannot be undone.`)) return;
+                try {
+                    const res = await fetch(`/admin/delete_progress/${userId}`, { method: 'POST' });
+                    const data = await res.json();
+                    if (data.message) {
+                        alert(data.message);
+                        window.location.reload();
+                    } else {
+                        alert('Error: ' + (data.error || 'Unknown'));
+                    }
+                } catch (e) {
+                    alert('Network error.');
+                }
+            });
+        });
+
+        // ---- Change Password (AJAX form) ----
+        document.querySelectorAll('.change-pw-form').forEach(form => {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const userId = this.dataset.userid;
+                const passwordInput = this.querySelector('input[name="new_password"]');
+                const newPassword = passwordInput.value.trim();
+                if (!newPassword || newPassword.length < 4) {
+                    alert('Password must be at least 4 characters.');
+                    return;
+                }
+                if (!confirm(`Set new password for this user?`)) return;
+                try {
+                    const res = await fetch(`/admin/change_password/${userId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: `new_password=${encodeURIComponent(newPassword)}`
+                    });
+                    const data = await res.json();
+                    if (data.message) {
+                        alert(data.message);
+                        passwordInput.value = '';
+                    } else {
+                        alert('Error: ' + (data.error || 'Unknown'));
+                    }
+                } catch (e) {
+                    alert('Network error.');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

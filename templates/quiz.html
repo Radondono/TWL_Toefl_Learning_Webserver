@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz - TOEFL Vocab</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-card" id="app">
+        <!-- Header -->
+        <div class="header-row">
+            <h1>📘 TOEFL Vocab</h1>
+            <div>
+                <span class="user-label">👤 {{ username }}</span>
+                <a href="/dashboard" class="btn btn-outline">🏠 Dashboard</a>
+                <a href="/logout" class="btn btn-danger-outline">Logout</a>
+            </div>
+        </div>
+        <div class="subtitle">Customise your quiz – choose difficulty, theme, length, and quiz mode.</div>
+
+        <!-- FILTER PANEL -->
+        <div class="filter-panel" id="filterPanel">
+            <div class="filter-group">
+                <label>Difficulty:</label>
+                <div class="options">
+                    <label><input type="checkbox" class="diff-check" value="3" checked> 3 (Inter)</label>
+                    <label><input type="checkbox" class="diff-check" value="4" checked> 4 (Adv)</label>
+                    <label><input type="checkbox" class="diff-check" value="5" checked> 5 (Expert)</label>
+                    <label><input type="checkbox" id="selectAllDiff" checked> All</label>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>Theme:</label>
+                <div class="options">
+                    <select id="themeSelect">
+                        <option value="">All Themes</option>
+                    </select>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>Quiz Mode:</label>
+                <div class="options">
+                    <label><input type="radio" name="mode" value="all" checked> All</label>
+                    <label><input type="radio" name="mode" value="learning"> Learning (in progress)</label>
+                    <label><input type="radio" name="mode" value="mastered"> Mastered</label>
+                    <label><input type="radio" name="mode" value="difficult"> Difficult</label>
+                    <label><input type="radio" name="mode" value="review"> 🔁 Review (due)</label>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>Questions:</label>
+                <input type="number" id="numQuestions" value="10" min="1" max="50">
+                <span class="hint">(max 50)</span>
+            </div>
+            <div class="filter-actions">
+                <button class="btn btn-primary" id="startBtn">🚀 Start Quiz</button>
+            </div>
+        </div>
+
+        <!-- QUIZ CONTAINER -->
+        <div id="quizContainer">
+            <div class="quiz-section" id="quizSection" style="display:none;">
+                <div class="quiz-header">
+                    <span class="progress-text" id="progressText">Question 1 / 10</span>
+                    <span class="score-text" id="scoreText">✅ 0 / 0</span>
+                </div>
+                <div class="progress-track">
+                    <div class="fill" id="progressFill"></div>
+                </div>
+
+                <div class="word-display">
+                    <div class="word-row">
+                        <div class="word" id="currentWord">—</div>
+                        <span class="pos-badge" id="posBadge"></span>
+                        <span class="badge-diff" id="diffBadge"></span>
+                        <button id="speakBtn" class="btn btn-outline speak-btn">🔊</button>
+                    </div>
+                    <div class="word-index" id="wordIndex">word 1 of 10</div>
+                </div>
+
+                <div class="options-grid" id="optionsContainer"></div>
+
+                <div class="feedback-area" id="feedbackArea">
+                    <div class="fb-msg" id="fbMsg"></div>
+                    <div class="fb-detail" id="fbDetail"></div>
+                </div>
+
+                <div class="quiz-actions">
+                    <button class="btn btn-primary" id="nextBtn" disabled>Next →</button>
+                    <button class="btn btn-danger-outline" id="quitBtn">✕ Quit</button>
+                </div>
+            </div>
+
+            <div class="results-panel" id="resultsPanel" style="display:none;">
+                <div class="result-emoji" id="resultEmoji">🎉</div>
+                <div class="big-score">
+                    <span id="finalScore">0</span><span class="denom"> / <span id="finalTotal">0</span></span>
+                </div>
+                <div class="result-label" id="resultLabel">Perfect!</div>
+                <div class="result-detail" id="resultDetail">You got all answers correct.</div>
+                <div class="review-list" id="reviewList"></div>
+                <div class="result-actions">
+                    <button class="btn btn-success" id="retryBtn">🔄 Retry</button>
+                    <a href="/dashboard" class="btn btn-outline">🏠 Dashboard</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // DOM refs
+            const startBtn = document.getElementById('startBtn');
+            const quizSection = document.getElementById('quizSection');
+            const progressText = document.getElementById('progressText');
+            const scoreText = document.getElementById('scoreText');
+            const progressFill = document.getElementById('progressFill');
+            const currentWord = document.getElementById('currentWord');
+            const wordIndex = document.getElementById('wordIndex');
+            const posBadge = document.getElementById('posBadge');
+            const diffBadge = document.getElementById('diffBadge');
+            const optionsContainer = document.getElementById('optionsContainer');
+            const fbMsg = document.getElementById('fbMsg');
+            const fbDetail = document.getElementById('fbDetail');
+            const nextBtn = document.getElementById('nextBtn');
+            const quitBtn = document.getElementById('quitBtn');
+            const resultsPanel = document.getElementById('resultsPanel');
+            const finalScore = document.getElementById('finalScore');
+            const finalTotal = document.getElementById('finalTotal');
+            const resultLabel = document.getElementById('resultLabel');
+            const resultDetail = document.getElementById('resultDetail');
+            const resultEmoji = document.getElementById('resultEmoji');
+            const reviewList = document.getElementById('reviewList');
+            const retryBtn = document.getElementById('retryBtn');
+            const speakBtn = document.getElementById('speakBtn');
+
+            // Filter elements
+            const diffChecks = document.querySelectorAll('.diff-check');
+            const selectAllDiff = document.getElementById('selectAllDiff');
+            const themeSelect = document.getElementById('themeSelect');
+            const numQuestions = document.getElementById('numQuestions');
+            const modeRadios = document.querySelectorAll('input[name="mode"]');
+
+            let questions = [];
+            let currentIndex = 0;
+            let score = 0;
+            let answered = false;
+            let userAnswers = [];
+
+            const LETTERS = ['A', 'B', 'C', 'D'];
+
+            // ---- Load themes ----
+            async function loadThemes() {
+                try {
+                    const res = await fetch('/api/themes');
+                    if (!res.ok) throw new Error();
+                    const themes = await res.json();
+                    themeSelect.innerHTML = '<option value="">All Themes</option>';
+                    themes.forEach(t => {
+                        const opt = document.createElement('option');
+                        opt.value = t;
+                        opt.textContent = t;
+                        themeSelect.appendChild(opt);
+                    });
+                } catch (e) {
+                    console.warn('Could not load themes:', e);
+                }
+            }
+            loadThemes();
+
+            // ---- "All" difficulty toggle ----
+            selectAllDiff.addEventListener('change', function() {
+                const checked = this.checked;
+                diffChecks.forEach(cb => cb.checked = checked);
+            });
+            diffChecks.forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const allChecked = Array.from(diffChecks).every(c => c.checked);
+                    selectAllDiff.checked = allChecked;
+                });
+            });
+
+            // ---- Play sound ----
+            function playSound(word) {
+                const utterance = new SpeechSynthesisUtterance(word);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.9;
+                window.speechSynthesis.speak(utterance);
+            }
+
+            // ---- Fetch quiz with filters ----
+            async function fetchQuiz() {
+                const diffs = Array.from(diffChecks).filter(cb => cb.checked).map(cb => cb.value);
+                const diffParam = diffs.length ? diffs.join(',') : '';
+
+                const themeValue = themeSelect.value;
+                const themeParam = themeValue ? themeValue : '';
+
+                let num = parseInt(numQuestions.value) || 10;
+                if (num < 1) num = 1;
+                if (num > 50) num = 50;
+
+                let mode = 'all';
+                for (const radio of modeRadios) {
+                    if (radio.checked) {
+                        mode = radio.value;
+                        break;
+                    }
+                }
+
+                const url = `/api/quiz?num=${num}&difficulty=${encodeURIComponent(diffParam)}&theme=${encodeURIComponent(themeParam)}&mode=${mode}`;
+                try {
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error();
+                    const data = await res.json();
+                    if (data.error) { alert(data.error); return false; }
+                    if (data.length === 0) {
+                        alert('No words match your filters and mode. Please adjust.');
+                        return false;
+                    }
+                    questions = data;
+                    return true;
+                } catch (e) {
+                    alert('Could not load quiz. Check server.');
+                    return false;
+                }
+            }
+
+            // ---- Render question ----
+            function renderQuestion(index) {
+                const q = questions[index];
+                if (!q) return;
+                currentWord.textContent = q.word;
+                posBadge.textContent = q.pos || '';
+                const diff = q.difficulty || 3;
+                diffBadge.textContent = diff;
+                diffBadge.className = 'badge-diff level-' + diff;
+                wordIndex.textContent = `word ${index + 1} of ${questions.length}`;
+                progressText.textContent = `Question ${index + 1} / ${questions.length}`;
+                progressFill.style.width = `${((index + 1) / questions.length) * 100}%`;
+
+                speakBtn.onclick = function() { playSound(q.word); };
+
+                optionsContainer.innerHTML = '';
+                q.options.forEach((opt, i) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'option-btn';
+                    btn.dataset.index = i;
+                    btn.innerHTML = `<span class="letter">${LETTERS[i]}</span><span>${opt.text}</span>`;
+                    btn.addEventListener('click', () => handleOptionClick(i));
+                    optionsContainer.appendChild(btn);
+                });
+
+                fbMsg.textContent = '';
+                fbMsg.className = 'fb-msg';
+                fbDetail.textContent = '';
+                answered = false;
+                nextBtn.disabled = true;
+                document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('disabled', 'correct', 'wrong'));
+                scoreText.textContent = `✅ ${score} / ${index}`;
+            }
+
+            // ---- Handle answer ----
+            async function handleOptionClick(selectedIndex) {
+                if (answered) return;
+                const q = questions[currentIndex];
+                const selectedOpt = q.options[selectedIndex];
+                const isCorrect = selectedOpt.correct;
+
+                const btns = document.querySelectorAll('.option-btn');
+                btns.forEach(b => b.classList.add('disabled'));
+                btns.forEach((btn, idx) => {
+                    const opt = q.options[idx];
+                    if (opt.correct) btn.classList.add('correct');
+                    if (idx === selectedIndex && !isCorrect) btn.classList.add('wrong');
+                });
+
+                userAnswers.push({
+                    word: q.word,
+                    definition: q.definition,
+                    userChoice: selectedOpt.text,
+                    correct: isCorrect,
+                });
+
+                try {
+                    await fetch('/api/progress', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ word: q.word, correct: isCorrect })
+                    });
+                } catch {}
+
+                if (isCorrect) {
+                    score++;
+                    fbMsg.textContent = '✅ Correct!';
+                    fbMsg.className = 'fb-msg correct';
+                } else {
+                    fbMsg.textContent = '❌ Not quite.';
+                    fbMsg.className = 'fb-msg wrong';
+                }
+                fbDetail.textContent = `"${q.word}" means: ${q.definition}`;
+                answered = true;
+                nextBtn.disabled = false;
+                scoreText.textContent = `✅ ${score} / ${currentIndex + 1}`;
+            }
+
+            function goToNext() {
+                if (currentIndex + 1 < questions.length) {
+                    currentIndex++;
+                    renderQuestion(currentIndex);
+                } else {
+                    showResults();
+                }
+            }
+
+            function showResults() {
+                quizSection.style.display = 'none';
+                resultsPanel.style.display = 'block';
+                const total = questions.length;
+                finalScore.textContent = score;
+                finalTotal.textContent = total;
+                const pct = total > 0 ? (score / total) * 100 : 0;
+                let emoji, label, detail;
+                if (pct === 100) { emoji = '🏆'; label = 'Perfect!'; detail = 'All words mastered!'; }
+                else if (pct >= 80) { emoji = '🌟'; label = 'Excellent!'; detail = 'Strong grasp.'; }
+                else if (pct >= 60) { emoji = '💪'; label = 'Good effort!'; detail = 'Review missed ones.'; }
+                else if (pct >= 40) { emoji = '📖'; label = 'Keep going!'; detail = 'More practice needed.'; }
+                else { emoji = '🔄'; label = 'Needs work.'; detail = 'Don\'t give up – retry!'; }
+                resultEmoji.textContent = emoji;
+                resultLabel.textContent = label;
+                resultDetail.textContent = detail;
+                reviewList.innerHTML = '';
+                userAnswers.forEach(ans => {
+                    const div = document.createElement('div');
+                    div.className = 'review-item';
+                    div.innerHTML = `
+                        <span class="r-icon">${ans.correct ? '✅' : '❌'}</span>
+                        <span class="r-word">${ans.word}</span>
+                        <span class="r-def">— ${ans.definition}</span>
+                        <span class="r-user">${ans.correct ? 'correct' : 'you: ' + ans.userChoice}</span>
+                    `;
+                    reviewList.appendChild(div);
+                });
+            }
+
+            // ---- Start quiz ----
+            async function startQuiz() {
+                const ok = await fetchQuiz();
+                if (!ok) return;
+                currentIndex = 0;
+                score = 0;
+                userAnswers = [];
+                resultsPanel.style.display = 'none';
+                quizSection.style.display = 'block';
+                renderQuestion(0);
+                document.getElementById('filterPanel').style.display = 'none';
+            }
+
+            function goHome() { window.location.href = '/dashboard'; }
+
+            // ---- Event listeners ----
+            startBtn.addEventListener('click', startQuiz);
+            nextBtn.addEventListener('click', goToNext);
+            quitBtn.addEventListener('click', () => {
+                if (confirm('Quit quiz? Your progress is saved.')) {
+                    document.getElementById('filterPanel').style.display = 'block';
+                    quizSection.style.display = 'none';
+                    resultsPanel.style.display = 'none';
+                }
+            });
+            retryBtn.addEventListener('click', function() {
+                resultsPanel.style.display = 'none';
+                document.getElementById('filterPanel').style.display = 'block';
+                quizSection.style.display = 'none';
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !nextBtn.disabled && quizSection.style.display !== 'none') {
+                    goToNext();
+                }
+            });
+
+        })();
+    </script>
+</body>
+</html>

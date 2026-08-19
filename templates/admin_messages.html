@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Send Message - TOEFL Vocab</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-card">
+        <div class="header-row">
+            <h1>📨 Send Message</h1>
+            <div>
+                <span class="user-label">👤 Admin</span>
+                <a href="/admin" class="btn btn-outline">⚙️ Admin Panel</a>
+                <a href="/dashboard" class="btn btn-outline">🏠 Dashboard</a>
+                <a href="/logout" class="btn btn-danger-outline">Logout</a>
+            </div>
+        </div>
+        <div class="subtitle">Broadcast to all users or send a private message</div>
+
+        {% if sent %}
+            <div style="background: #d4edda; color: #155724; padding: 12px 16px; border-radius: 12px; margin-bottom: 16px;">
+                ✅ Message sent successfully!
+            </div>
+        {% endif %}
+
+        {% if error %}
+            <div style="background: #f8d7da; color: #721c24; padding: 12px 16px; border-radius: 12px; margin-bottom: 16px;">
+                ❌ {{ error }}
+            </div>
+        {% endif %}
+
+        <form method="POST" style="margin-top: 20px;">
+            <div class="form-group">
+                <label for="receiver_id">Send to:</label>
+                <select name="receiver_id" id="receiver_id" class="form-input" required>
+                    <option value="all">🌐 All Users (Broadcast)</option>
+                    {% for user in users %}
+                        <option value="{{ user.id }}">🔒 {{ user.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="subject">Subject:</label>
+                <input type="text" name="subject" id="subject" class="form-input" placeholder="Message subject" required>
+            </div>
+            <div class="form-group">
+                <label for="body">Message:</label>
+                <textarea name="body" id="body" class="form-input" rows="6" placeholder="Write your message here..." required></textarea>
+            </div>
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button type="submit" class="btn btn-primary">📤 Send</button>
+                <a href="/admin" class="btn btn-outline">Cancel</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

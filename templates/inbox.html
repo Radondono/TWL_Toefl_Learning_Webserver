@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inbox - TOEFL Vocab</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-card wide">
+        <div class="header-row">
+            <h1>📬 Inbox</h1>
+            <div>
+                <span class="user-label">👤 {{ username }}</span>
+                <a href="/dashboard" class="btn btn-outline">🏠 Dashboard</a>
+                <a href="/logout" class="btn btn-danger-outline">Logout</a>
+            </div>
+        </div>
+        <div class="subtitle">Your messages from the admin</div>
+
+        {% if messages %}
+            <div class="inbox-list">
+                {% for msg in messages %}
+                    <div class="inbox-item" style="border: 1px solid #e4ebf5; border-radius: 16px; padding: 16px; margin-bottom: 12px; background: {% if not msg.read %}#f8faff{% else %}white{% endif %};">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <a href="/inbox/{{ msg.id }}" style="text-decoration: none; color: #0b1e3a; flex:1;">
+                                <strong>
+                                    {% if not msg.read %}🔵 {% endif %}
+                                    {{ msg.subject }}
+                                </strong>
+                                <span style="font-weight: normal; font-size: 14px; color: #7a8aa5; margin-left: 8px;">
+                                    {% if msg.receiver_id is none %}
+                                        (Broadcast)
+                                    {% else %}
+                                        (Private)
+                                    {% endif %}
+                                </span>
+                            </a>
+                            <span style="font-size: 13px; color: #7a8aa5;">
+                                {{ msg.created_at.split('T')[0] if 'T' in msg.created_at else msg.created_at.split(' ')[0] }}
+                            </span>
+                        </div>
+                        <div style="margin-top: 8px; color: #4a5b7a; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            {{ msg.body[:100] }}{% if msg.body|length > 100 %}...{% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 40px; color: #7a8aa5;">
+                📭 Your inbox is empty.
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>

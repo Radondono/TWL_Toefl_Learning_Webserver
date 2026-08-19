@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Message - TOEFL Vocab</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-card">
+        <div class="header-row">
+            <h1>📬 Message</h1>
+            <div>
+                <span class="user-label">👤 {{ username }}</span>
+                <a href="/inbox" class="btn btn-outline">← Back to Inbox</a>
+                <a href="/dashboard" class="btn btn-outline">🏠 Dashboard</a>
+                <a href="/logout" class="btn btn-danger-outline">Logout</a>
+            </div>
+        </div>
+        <div class="subtitle">
+            {{ msg.subject }}
+            <span style="font-size: 14px; font-weight: normal; margin-left: 12px; color: #7a8aa5;">
+                {{ msg.created_at }}
+                {% if msg.receiver_id is none %}
+                    (Broadcast)
+                {% else %}
+                    (Private)
+                {% endif %}
+            </span>
+        </div>
+
+        <div style="background: white; border-radius: 20px; padding: 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.04);">
+            <div style="white-space: pre-wrap; line-height: 1.6; color: #0b1e3a;">
+                {{ msg.body }}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
