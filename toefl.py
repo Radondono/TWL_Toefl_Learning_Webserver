@@ -548,29 +548,56 @@ def dashboard():
         return redirect(url_for('login'))
     user_id = session['user_id']
     unread = get_unread_count(user_id)
-    words = get_all_words()
+    all_words = get_all_words()
     progress = get_user_progress(user_id)
+
+    word_list = []
     mastered_count = in_progress_count = not_started_count = difficult_count = 0
     due_count = 0
     now = datetime.now()
-    for w in words:
+
+    for w in all_words:
         p = progress.get(w['id'], {'attempts': 0, 'correct': 0, 'mastered': False,
                                    'difficult': False, 'next_review': now})
+        status = 'not_started'
         if p['mastered']:
+            status = 'mastered'
             mastered_count += 1
         elif p['attempts'] > 0:
+            status = 'learning'
             in_progress_count += 1
         else:
             not_started_count += 1
+
         if p['difficult']:
             difficult_count += 1
+
         if p['attempts'] > 0:
             next_review = p['next_review']
             if isinstance(next_review, str):
                 next_review = datetime.fromisoformat(next_review)
             if next_review <= now:
                 due_count += 1
-    total_words = len(words)
+
+        word_list.append({
+            'id': w['id'],
+            'word': w['word'],
+            'definition': w['definition'],
+            'pos': w['pos'],
+            'difficulty': w['difficulty'],
+            'theme': w['theme'],
+            'synonyms': w['synonyms'],
+            'example': w['example'],
+            'status': status,
+            'difficult': p['difficult'],
+            'attempts': p['attempts'],
+            'correct': p['correct'],
+            'next_review': p['next_review']
+        })
+
+    seen_words = [w for w in word_list if w['attempts'] > 0]
+    total_words = len(all_words)
+
     return render_template('dashboard.html',
                            username=session['username'],
                            role=session['role'],
@@ -580,7 +607,8 @@ def dashboard():
                            not_started_count=not_started_count,
                            difficult_count=difficult_count,
                            due_count=due_count,
-                           unread=unread)
+                           unread=unread,
+                           words=seen_words)          # <-- this is the missing part
 
 @app.route('/words')
 def words_page():
