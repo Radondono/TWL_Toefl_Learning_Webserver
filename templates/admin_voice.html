@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select TTS Voice - Admin</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .voice-list { max-height: 400px; overflow-y: auto; border: 1px solid #e4ebf5; border-radius: 12px; padding: 8px; }
+        .voice-item { padding: 8px 12px; cursor: pointer; border-radius: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .voice-item:hover { background: #f0f4ff; }
+        .voice-item.selected { background: #dce6f5; font-weight: 600; }
+        .voice-item .name { font-weight: 500; }
+        .voice-item .lang { color: #7a8aa5; font-size: 13px; margin-left: 8px; }
+        .voice-item .sample { font-size: 14px; color: #4a5b7a; margin-left: 12px; }
+        .test-btn { margin-left: auto; }
+    </style>
+</head>
+<body>
+    <div class="app-card">
+        <div class="header-row">
+            <h1>🔊 Select TTS Voice</h1>
+            <div>
+                <span class="user-label">👤 Admin</span>
+                <a href="/admin" class="btn btn-outline">⚙️ Admin Panel</a>
+                <a href="/dashboard" class="btn btn-outline">🏠 Dashboard</a>
+                <a href="/logout" class="btn btn-danger-outline">Logout</a>
+            </div>
+        </div>
+        <div class="subtitle">Choose the voice that all users will hear when they click the speaker button.</div>
+
+        <form method="POST" id="voiceForm">
+            <div class="form-group">
+                <label>Available Voices</label>
+                <div class="voice-list" id="voiceList">
+                    <div style="text-align:center; padding:20px; color:#7a8aa5;">Loading voices...</div>
+                </div>
+                <p style="margin-top:8px; font-size:14px; color:#7a8aa5;">
+                    Click a voice to select it, then click "Save" below. You can also test each voice by clicking the 🔊 button.
+                </p>
+            </div>
+            <div style="display:flex; gap:12px; margin-top:16px; align-items:center; flex-wrap:wrap;">
+                <input type="hidden" name="voice_name" id="voiceName" value="">
+                <button type="submit" class="btn btn-primary">💾 Save Selected Voice</button>
+                <button type="button" class="btn btn-outline" id="resetBtn">Reset to Default</button>
+                <span style="margin-left:auto; color:#5a6e8a;">Current: <strong id="currentVoiceDisplay">{{ current_voice or 'Default' }}</strong></span>
+            </div>
+        </form>
+
+        <div style="margin-top:20px; padding:12px; background:#f0f4ff; border-radius:12px; font-size:14px;">
+            <strong>Note:</strong> Voices depend on your browser and operating system. If a selected voice is not available on a user's device, the system will fall back to the default voice.
+        </div>
+    </div>
+
+    <script>
+        let allVoices = [];
+        let selectedVoiceName = '{{ current_voice }}';
+
+        function populateVoices() {
+            const list = document.getElementById('voiceList');
+            const voices = window.speechSynthesis.getVoices();
+            if (!voices || voices.length === 0) {
+                list.innerHTML = '<div style="text-align:center; padding:20px; color:#7a8aa5;">No voices found. Try reloading the page or check your browser settings.</div>';
+                return;
+            }
+            allVoices = voices;
+            let html = '';
+            voices.forEach((v) => {
+                const isSelected = v.name === selectedVoiceName;
+                html += `
+                    <div class="voice-item ${isSelected ? 'selected' : ''}" data-name="${v.name}">
+                        <span class="name">${v.name}</span>
+                        <span class="lang">${v.lang}</span>
+                        <span class="sample">${v.default ? ' (default)' : ''}</span>
+                        <button type="button" class="btn btn-outline test-btn" data-voice-name="${v.name}">🔊 Test</button>
+                    </div>
+                `;
+            });
+            list.innerHTML = html;
+
+            // Attach click events to each voice item (select on click)
+            document.querySelectorAll('.voice-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    // Ignore if click on the test button
+                    if (e.target.closest('.test-btn')) return;
+                    const name = this.dataset.name;
+                    selectVoice(name);
+                });
+            });
+
+            // Attach test button events
+            document.querySelectorAll('.test-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation(); // prevent selecting the voice item
+                    const name = this.dataset.voiceName;
+                    testVoice(name);
+                });
+            });
+
+            // Update hidden input and current display
+            if (selectedVoiceName) {
+                document.getElementById('voiceName').value = selectedVoiceName;
+                document.getElementById('currentVoiceDisplay').textContent = selectedVoiceName;
+            } else {
+                document.getElementById('voiceName').value = '';
+                document.getElementById('currentVoiceDisplay').textContent = 'Default';
+            }
+        }
+
+        function selectVoice(name) {
+            selectedVoiceName = name;
+            document.getElementById('voiceName').value = name;
+            document.getElementById('currentVoiceDisplay').textContent = name;
+            document.querySelectorAll('.voice-item').forEach(el => el.classList.remove('selected'));
+            const item = document.querySelector(`.voice-item[data-name="${name}"]`);
+            if (item) item.classList.add('selected');
+        }
+
+        function testVoice(name) {
+            const voice = allVoices.find(v => v.name === name);
+            if (!voice) {
+                alert('Voice not found!');
+                return;
+            }
+            const utterance = new SpeechSynthesisUtterance('Hello, this is the selected voice.');
+            utterance.voice = voice;
+            utterance.lang = voice.lang || 'en-US';
+            utterance.rate = 0.9;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // Reset to default
+        document.getElementById('resetBtn').addEventListener('click', function() {
+            selectedVoiceName = '';
+            document.getElementById('voiceName').value = '';
+            document.getElementById('currentVoiceDisplay').textContent = 'Default';
+            document.querySelectorAll('.voice-item').forEach(el => el.classList.remove('selected'));
+        });
+
+        // Load voices when ready
+        if (window.speechSynthesis.onvoiceschanged !== undefined) {
+            window.speechSynthesis.onvoiceschanged = populateVoices;
+        }
+        setTimeout(populateVoices, 200); // fallback
+    </script>
+</body>
+</html>

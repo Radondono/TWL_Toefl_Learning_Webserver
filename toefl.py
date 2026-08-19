@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
-TOEFL Vocabulary Quiz Server with Admin Messaging System
-- Admin can broadcast or send private messages
-- Users have an inbox with unread count
+TOEFL Vocabulary Quiz Server with Admin‑configurable TTS voice.
 """
 
 import os
@@ -12,18 +10,25 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 import pandas as pd
+import json
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = 'f4a2b1c3d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2'  # CHANGE ME
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=False,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_DOMAIN=None,
+    PERMANENT_SESSION_LIFETIME=timedelta(days=7)
+)
+
 PORT = 3000
 DB_PATH = 'toefl.db'
 CSV_PATH = 'toefl_words.csv'
-
-# ─── G7 intervals ───
 REVIEW_INTERVALS = [1, 2, 4, 7, 14, 30, 60]
 MAX_LEVEL = len(REVIEW_INTERVALS) - 1
 
-# ─── Database schema ───
+# ─── Database ───
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -78,6 +83,12 @@ def init_db():
             FOREIGN KEY (sender_id) REFERENCES users(id)
         )
     ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    ''')
     conn.commit()
     conn.close()
     migrate_db()
@@ -90,19 +101,17 @@ def migrate_db():
     user_cols = [col[1] for col in c.fetchall()]
     if 'banned' not in user_cols:
         c.execute("ALTER TABLE users ADD COLUMN banned BOOLEAN DEFAULT 0")
-        conn.commit()
     # Progress: SRS columns
     c.execute("PRAGMA table_info(progress)")
     prog_cols = [col[1] for col in c.fetchall()]
-    for col in ['review_level', 'next_review', 'last_reviewed']:
+    for col, typ in [('review_level', 'INTEGER'), ('next_review', 'TIMESTAMP'), ('last_reviewed', 'TIMESTAMP')]:
         if col not in prog_cols:
-            c.execute(f"ALTER TABLE progress ADD COLUMN {col} {('INTEGER' if col=='review_level' else 'TIMESTAMP')}")
-            conn.commit()
+            c.execute(f"ALTER TABLE progress ADD COLUMN {col} {typ}")
     if 'review_level' not in prog_cols:
         c.execute("UPDATE progress SET review_level = 0 WHERE review_level IS NULL")
     if 'next_review' not in prog_cols:
         c.execute("UPDATE progress SET next_review = CURRENT_TIMESTAMP WHERE next_review IS NULL")
-    # Messages table is created above, no migration needed.
+    # Settings table already exists from init_db, no migration needed.
     conn.commit()
     conn.close()
     print("✅ Database migration complete.")
@@ -157,7 +166,23 @@ init_db()
 create_admin_if_missing()
 load_vocabulary_from_csv()
 
-# ─── Helpers ───
+# ─── Helper: get/set settings ───
+def get_setting(key, default=None):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT value FROM settings WHERE key = ?", (key,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else default
+
+def set_setting(key, value):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
+    conn.commit()
+    conn.close()
+
+# ─── Helpers (unchanged) ───
 def get_all_words():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -482,6 +507,7 @@ def login():
             session['user_id'] = user['id']
             session['username'] = user['username']
             session['role'] = user['role']
+            session.permanent = True
             return redirect(url_for('dashboard'))
         elif user and user['banned']:
             return render_template('login.html', error='Your account has been banned.')
@@ -524,19 +550,15 @@ def dashboard():
     unread = get_unread_count(user_id)
     words = get_all_words()
     progress = get_user_progress(user_id)
-    word_list = []
     mastered_count = in_progress_count = not_started_count = difficult_count = 0
     due_count = 0
     now = datetime.now()
     for w in words:
         p = progress.get(w['id'], {'attempts': 0, 'correct': 0, 'mastered': False,
                                    'difficult': False, 'next_review': now})
-        status = 'not_started'
         if p['mastered']:
-            status = 'mastered'
             mastered_count += 1
         elif p['attempts'] > 0:
-            status = 'learning'
             in_progress_count += 1
         else:
             not_started_count += 1
@@ -548,6 +570,36 @@ def dashboard():
                 next_review = datetime.fromisoformat(next_review)
             if next_review <= now:
                 due_count += 1
+    total_words = len(words)
+    return render_template('dashboard.html',
+                           username=session['username'],
+                           role=session['role'],
+                           total_words=total_words,
+                           mastered_count=mastered_count,
+                           in_progress_count=in_progress_count,
+                           not_started_count=not_started_count,
+                           difficult_count=difficult_count,
+                           due_count=due_count,
+                           unread=unread)
+
+@app.route('/words')
+def words_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user_id = session['user_id']
+    words = get_all_words()
+    progress = get_user_progress(user_id)
+    word_list = []
+    for w in words:
+        p = progress.get(w['id'], {'attempts': 0, 'correct': 0, 'mastered': False,
+                                   'difficult': False, 'next_review': datetime.now()})
+        status = 'not_started'
+        if p['mastered']:
+            status = 'mastered'
+        elif p['attempts'] > 0:
+            status = 'learning'
+        else:
+            status = 'not_started'
         word_list.append({
             'id': w['id'],
             'word': w['word'],
@@ -564,17 +616,8 @@ def dashboard():
             'next_review': p['next_review']
         })
     seen_words = [w for w in word_list if w['attempts'] > 0]
-    total_words = len(words)
-    return render_template('dashboard.html',
+    return render_template('words.html',
                            username=session['username'],
-                           role=session['role'],
-                           total_words=total_words,
-                           mastered_count=mastered_count,
-                           in_progress_count=in_progress_count,
-                           not_started_count=not_started_count,
-                           difficult_count=difficult_count,
-                           due_count=due_count,
-                           unread=unread,
                            words=seen_words)
 
 @app.route('/inbox')
@@ -643,7 +686,7 @@ def admin_messages():
         if not subject or not body:
             return render_template('admin_messages.html', error='Subject and body required.', users=get_all_users_except(session['user_id']))
         if receiver_id == 'all':
-            receiver_id = None  # broadcast
+            receiver_id = None
         else:
             try:
                 receiver_id = int(receiver_id)
@@ -654,6 +697,30 @@ def admin_messages():
     users = get_all_users_except(session['user_id'])
     sent = request.args.get('sent')
     return render_template('admin_messages.html', users=users, sent=sent)
+
+@app.route('/admin/voice', methods=['GET', 'POST'])
+def admin_voice():
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return redirect(url_for('dashboard'))
+    current_voice = get_setting('tts_voice', '')
+    if request.method == 'POST':
+        voice_name = request.form.get('voice_name', '').strip()
+        if voice_name:
+            set_setting('tts_voice', voice_name)
+        else:
+            # If empty, delete the setting (use default)
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute("DELETE FROM settings WHERE key = 'tts_voice'")
+            conn.commit()
+            conn.close()
+        return redirect(url_for('admin_voice'))
+    return render_template('admin_voice.html', current_voice=current_voice)
+
+@app.route('/api/settings/tts_voice', methods=['GET'])
+def api_tts_voice():
+    voice = get_setting('tts_voice', '')
+    return jsonify({'voice': voice})
 
 @app.route('/admin/ban/<int:user_id>', methods=['POST'])
 def admin_ban(user_id):
@@ -797,5 +864,6 @@ def api_toggle_difficult():
 def serve_static(path):
     return send_from_directory('static', path)
 
+# ─── Run ───
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=PORT, debug=True)
+    app.run(host='0.0.0.0', port=PORT, debug=False)

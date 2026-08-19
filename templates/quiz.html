@@ -8,7 +8,6 @@
 </head>
 <body>
     <div class="app-card" id="app">
-        <!-- Header -->
         <div class="header-row">
             <h1>📘 TOEFL Vocab</h1>
             <div>
@@ -108,9 +107,12 @@
         </div>
     </div>
 
+    <!-- Shared script provides playSound, attachSpeakerButtons, etc. -->
+    <script src="/static/script.js"></script>
+
     <script>
         (function() {
-            // DOM refs
+            // ─── Page‑specific quiz logic ───
             const startBtn = document.getElementById('startBtn');
             const quizSection = document.getElementById('quizSection');
             const progressText = document.getElementById('progressText');
@@ -135,7 +137,6 @@
             const retryBtn = document.getElementById('retryBtn');
             const speakBtn = document.getElementById('speakBtn');
 
-            // Filter elements
             const diffChecks = document.querySelectorAll('.diff-check');
             const selectAllDiff = document.getElementById('selectAllDiff');
             const themeSelect = document.getElementById('themeSelect');
@@ -181,15 +182,7 @@
                 });
             });
 
-            // ---- Play sound ----
-            function playSound(word) {
-                const utterance = new SpeechSynthesisUtterance(word);
-                utterance.lang = 'en-US';
-                utterance.rate = 0.9;
-                window.speechSynthesis.speak(utterance);
-            }
-
-            // ---- Fetch quiz with filters ----
+            // ---- Fetch quiz ----
             async function fetchQuiz() {
                 const diffs = Array.from(diffChecks).filter(cb => cb.checked).map(cb => cb.value);
                 const diffParam = diffs.length ? diffs.join(',') : '';
@@ -240,6 +233,7 @@
                 progressText.textContent = `Question ${index + 1} / ${questions.length}`;
                 progressFill.style.width = `${((index + 1) / questions.length) * 100}%`;
 
+                // Use shared playSound from script.js
                 speakBtn.onclick = function() { playSound(q.word); };
 
                 optionsContainer.innerHTML = '';

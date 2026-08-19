@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Words - TOEFL Vocab</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-card wide">
+        <div class="header-row">
+            <h1>📚 My Words</h1>
+            <div>
+                <span class="user-label">👤 {{ username }}</span>
+                <a href="/dashboard" class="btn btn-outline">🏠 Dashboard</a>
+                <a href="/logout" class="btn btn-danger-outline">Logout</a>
+            </div>
+        </div>
+        <div class="subtitle">All words you've seen – sort, listen, mark difficult, and see next review dates.</div>
+
+        <div class="table-wrap">
+            <table id="wordTable">
+                <thead>
+                    <tr>
+                        <th class="sortable" data-sort="word">Word</th>
+                        <th>Definition</th>
+                        <th class="sortable" data-sort="pos">POS</th>
+                        <th class="sortable" data-sort="diff">Difficulty</th>
+                        <th class="sortable" data-sort="status">Status</th>
+                        <th class="sortable" data-sort="attempts">Attempts</th>
+                        <th class="sortable" data-sort="correct">Correct</th>
+                        <th>Difficult</th>
+                        <th>Next Review</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    {% for word in words %}
+                        <tr>
+                            <td>
+                                {{ word.word }}
+                                <button class="speaker-btn" data-word="{{ word.word }}" title="Listen">🔊</button>
+                            </td>
+                            <td>
+                                {{ word.definition }}
+                                <span class="toggle-details" data-target="details-{{ loop.index }}">[details]</span>
+                            </td>
+                            <td class="center">{{ word.pos }}</td>
+                            <td class="center"><span class="badge-diff level-{{ word.difficulty }}">{{ word.difficulty }}</span></td>
+                            <td class="center">
+                                {% if word.status == 'mastered' %}
+                                    <span class="status-mastered">✅ Mastered</span>
+                                {% elif word.status == 'learning' %}
+                                    <span class="status-learning">🔄 Learning</span>
+                                {% else %}
+                                    <span class="status-notstarted">⬜ Not started</span>
+                                {% endif %}
+                            </td>
+                            <td class="center">{{ word.attempts }}</td>
+                            <td class="center">{{ word.correct }}</td>
+                            <td class="center">
+                                <button class="btn toggle-diff" data-word="{{ word.word }}">
+                                    {% if word.difficult %}⭐{% else %}☆{% endif %}
+                                </button>
+                            </td>
+                            <td class="center">
+                                {% if word.next_review %}
+                                    {{ word.next_review.split(' ')[0] }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr id="details-{{ loop.index }}" class="row-details">
+                            <td colspan="9">
+                                <strong>Theme:</strong> {{ word.theme or '—' }} &nbsp;|&nbsp;
+                                <strong>Synonyms:</strong> {{ word.synonyms or '—' }}<br>
+                                <strong>Example:</strong> <em>{{ word.example or '—' }}</em>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="9" class="empty-msg">
+                                You haven't started any words yet. Take a quiz to begin!
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="dashboard-footer">
+            Click 🔊 to hear a word. Click [details] to see theme, synonyms, and example sentence. Click headers to sort.
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

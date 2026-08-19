@@ -16,12 +16,12 @@
                     <span class="badge admin-badge">Admin</span>
                 {% endif %}
                 <a href="/inbox" class="btn btn-outline">📬 Inbox</a>
+                <a href="/words" class="btn btn-outline">📚 My Words</a>
                 <a href="/logout" class="btn btn-danger-outline">Logout</a>
             </div>
         </div>
         <div class="subtitle">
-            Your progress – only words you've seen at least once are shown.
-            <span class="seen-count">{{ words|length }} seen</span>
+            Your learning summary – track your progress and jump to practice.
         </div>
 
         <!-- Stats -->
@@ -58,201 +58,19 @@
 
         <div class="action-buttons">
             <a href="/quiz" class="btn btn-primary">🎯 Start Practice Quiz</a>
+            <a href="/words" class="btn btn-outline">📚 View All My Words</a>
             {% if role == 'admin' %}
                 <a href="/admin" class="btn btn-outline">⚙️ Admin Panel</a>
                 <a href="/admin/messages" class="btn btn-outline">📨 Send Message</a>
+                <a href="/admin/voice" class="btn btn-outline">🔊 TTS Voice</a>
             {% endif %}
         </div>
 
-        <!-- Word table -->
-        <div class="table-wrap">
-            <table id="wordTable">
-                <thead>
-                    <tr>
-                        <th class="sortable" data-sort="word">Word</th>
-                        <th>Definition</th>
-                        <th class="sortable" data-sort="pos">POS</th>
-                        <th class="sortable" data-sort="diff">Difficulty</th>
-                        <th class="sortable" data-sort="status">Status</th>
-                        <th class="sortable" data-sort="attempts">Attempts</th>
-                        <th class="sortable" data-sort="correct">Correct</th>
-                        <th>Difficult</th>
-                        <th>Next Review</th>
-                    </tr>
-                </thead>
-                <tbody id="tableBody">
-                    {% for word in words %}
-                        <tr>
-                            <td>
-                                {{ word.word }}
-                                <button class="speaker-btn" data-word="{{ word.word }}" title="Listen">🔊</button>
-                            </td>
-                            <td>
-                                {{ word.definition }}
-                                <span class="toggle-details" data-target="details-{{ loop.index }}">[details]</span>
-                            </td>
-                            <td class="center">{{ word.pos }}</td>
-                            <td class="center"><span class="badge-diff level-{{ word.difficulty }}">{{ word.difficulty }}</span></td>
-                            <td class="center">
-                                {% if word.status == 'mastered' %}
-                                    <span class="status-mastered">✅ Mastered</span>
-                                {% elif word.status == 'learning' %}
-                                    <span class="status-learning">🔄 Learning</span>
-                                {% else %}
-                                    <span class="status-notstarted">⬜ Not started</span>
-                                {% endif %}
-                            </td>
-                            <td class="center">{{ word.attempts }}</td>
-                            <td class="center">{{ word.correct }}</td>
-                            <td class="center">
-                                <button class="btn toggle-diff" data-word="{{ word.word }}">
-                                    {% if word.difficult %}⭐{% else %}☆{% endif %}
-                                </button>
-                            </td>
-                            <td class="center">
-                                {% if word.next_review %}
-                                    {{ word.next_review.split(' ')[0] }}
-                                {% else %}
-                                    —
-                                {% endif %}
-                            </td>
-                        </tr>
-                        <tr id="details-{{ loop.index }}" class="row-details">
-                            <td colspan="9">
-                                <strong>Theme:</strong> {{ word.theme or '—' }} &nbsp;|&nbsp;
-                                <strong>Synonyms:</strong> {{ word.synonyms or '—' }}<br>
-                                <strong>Example:</strong> <em>{{ word.example or '—' }}</em>
-                            </td>
-                        </tr>
-                    {% else %}
-                        <tr>
-                            <td colspan="9" class="empty-msg">
-                                You haven't started any words yet. Take a quiz to begin!
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
         <div class="dashboard-footer">
-            Click 🔊 to hear a word. Click [details] to see theme, synonyms, and example sentence. Click headers to sort.
+            Use the "My Words" page to see every word you've learned, sort, and mark difficult words.
         </div>
     </div>
 
-    <script>
-        // ---- Play sound (TTS) ----
-        function playSound(word) {
-            const utterance = new SpeechSynthesisUtterance(word);
-            utterance.lang = 'en-US';
-            utterance.rate = 0.9;
-            window.speechSynthesis.speak(utterance);
-        }
-
-        // ---- Speaker buttons ----
-        document.querySelectorAll('.speaker-btn').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                playSound(this.dataset.word);
-            });
-        });
-
-        // ---- Toggle details ----
-        document.querySelectorAll('.toggle-details').forEach(el => {
-            el.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const targetId = this.dataset.target;
-                const row = document.getElementById(targetId);
-                if (row) {
-                    row.classList.toggle('show');
-                    this.textContent = row.classList.contains('show') ? '[hide]' : '[details]';
-                }
-            });
-        });
-
-        // ---- Table sorting ----
-        document.querySelectorAll('.sortable').forEach(th => {
-            th.addEventListener('click', function() {
-                const tbody = document.getElementById('tableBody');
-                const mainRows = Array.from(tbody.querySelectorAll('tr:not(.row-details)'));
-                const currentDir = this.classList.contains('asc') ? 'asc' : (this.classList.contains('desc') ? 'desc' : null);
-                document.querySelectorAll('.sortable').forEach(h => h.classList.remove('asc', 'desc'));
-                let newDir = 'asc';
-                if (currentDir === 'asc') {
-                    this.classList.add('desc');
-                    newDir = 'desc';
-                } else {
-                    this.classList.add('asc');
-                }
-                const sortKey = this.dataset.sort;
-                const statusOrder = { 'mastered': 0, 'learning': 1, 'not_started': 2 };
-                mainRows.sort((a, b) => {
-                    let valA, valB;
-                    const cellsA = a.querySelectorAll('td');
-                    const cellsB = b.querySelectorAll('td');
-                    if (sortKey === 'word') {
-                        valA = cellsA[0].textContent.trim().toLowerCase();
-                        valB = cellsB[0].textContent.trim().toLowerCase();
-                    } else if (sortKey === 'pos') {
-                        valA = cellsA[2].textContent.trim().toLowerCase();
-                        valB = cellsB[2].textContent.trim().toLowerCase();
-                    } else if (sortKey === 'diff') {
-                        valA = parseInt(cellsA[3].textContent) || 0;
-                        valB = parseInt(cellsB[3].textContent) || 0;
-                    } else if (sortKey === 'status') {
-                        const getStatus = (el) => {
-                            const txt = el.textContent;
-                            if (txt.includes('Mastered')) return 'mastered';
-                            if (txt.includes('Learning')) return 'learning';
-                            return 'not_started';
-                        };
-                        valA = statusOrder[getStatus(cellsA[4])];
-                        valB = statusOrder[getStatus(cellsB[4])];
-                    } else if (sortKey === 'difficult') {
-                        valA = cellsA[7].querySelector('button').textContent.includes('⭐') ? 1 : 0;
-                        valB = cellsB[7].querySelector('button').textContent.includes('⭐') ? 1 : 0;
-                    } else {
-                        const idx = sortKey === 'attempts' ? 5 : 6;
-                        valA = parseInt(cellsA[idx].textContent) || 0;
-                        valB = parseInt(cellsB[idx].textContent) || 0;
-                    }
-                    if (valA < valB) return newDir === 'asc' ? -1 : 1;
-                    if (valA > valB) return newDir === 'asc' ? 1 : -1;
-                    return 0;
-                });
-                // Rebuild tbody with main rows and their details rows
-                const detailRows = Array.from(tbody.querySelectorAll('.row-details'));
-                tbody.innerHTML = '';
-                mainRows.forEach(row => {
-                    const rowId = row.querySelector('.toggle-details')?.dataset.target;
-                    tbody.appendChild(row);
-                    const detail = detailRows.find(d => d.id === rowId);
-                    if (detail) tbody.appendChild(detail);
-                });
-            });
-        });
-
-        // ---- Toggle difficult ----
-        document.querySelectorAll('.toggle-diff').forEach(btn => {
-            btn.addEventListener('click', async function() {
-                const word = this.dataset.word;
-                try {
-                    const res = await fetch('/api/toggle_difficult', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ word: word })
-                    });
-                    const data = await res.json();
-                    if (data.message) {
-                        window.location.reload();
-                    } else {
-                        alert('Error: ' + (data.error || 'Unknown'));
-                    }
-                } catch (e) {
-                    alert('Network error.');
-                }
-            });
-        });
-    </script>
+    <script src="/static/script.js"></script>
 </body>
 </html>
