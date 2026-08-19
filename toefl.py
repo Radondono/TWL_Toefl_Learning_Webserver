@@ -111,7 +111,6 @@ def migrate_db():
         c.execute("UPDATE progress SET review_level = 0 WHERE review_level IS NULL")
     if 'next_review' not in prog_cols:
         c.execute("UPDATE progress SET next_review = CURRENT_TIMESTAMP WHERE next_review IS NULL")
-    # Settings table already exists from init_db, no migration needed.
     conn.commit()
     conn.close()
     print("✅ Database migration complete.")
@@ -182,7 +181,7 @@ def set_setting(key, value):
     conn.commit()
     conn.close()
 
-# ─── Helpers (unchanged) ───
+# ─── Helpers ───
 def get_all_words():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -608,7 +607,7 @@ def dashboard():
                            difficult_count=difficult_count,
                            due_count=due_count,
                            unread=unread,
-                           words=seen_words)          # <-- this is the missing part
+                           words=seen_words)
 
 @app.route('/words')
 def words_page():
@@ -736,7 +735,6 @@ def admin_voice():
         if voice_name:
             set_setting('tts_voice', voice_name)
         else:
-            # If empty, delete the setting (use default)
             conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
             c.execute("DELETE FROM settings WHERE key = 'tts_voice'")
